@@ -1,35 +1,15 @@
 """
-Evaluation script for trained Q-Learning agent on CartPole-v1.
+Evaluation script for trained DQN agent on CartPole-v1.
 
-This script loads a trained agent and evaluates its performance,
+This script loads a trained DQN agent and evaluates its performance,
 optionally rendering the environment to visualize the agent's behavior.
 """
 
 import gymnasium as gym
 import numpy as np
-from agent import QLearningAgent, StateDiscretizer
+from agent import DQNAgent
 import argparse
 import os
-
-
-def create_cartpole_discretizer():
-    """
-    Create state discretizer for CartPole environment.
-    Must match the discretizer used during training.
-    
-    Returns:
-        StateDiscretizer configured for CartPole
-    """
-    state_bounds = np.array([
-        [-4.8, 4.8],      # Cart Position
-        [-3.0, 3.0],      # Cart Velocity
-        [-0.418, 0.418],  # Pole Angle
-        [-2.0, 2.0]       # Pole Angular Velocity
-    ])
-    
-    n_bins = np.array([10, 10, 10, 10])
-    
-    return StateDiscretizer(state_bounds, n_bins)
 
 
 def evaluate_agent(
@@ -39,7 +19,7 @@ def evaluate_agent(
     render: bool = False
 ):
     """
-    Evaluate a trained Q-learning agent.
+    Evaluate a trained DQN agent.
     
     Args:
         model_path: Path to saved agent model
@@ -56,21 +36,20 @@ def evaluate_agent(
     else:
         env = gym.make('CartPole-v1')
     
-    # Create discretizer
-    discretizer = create_cartpole_discretizer()
-    
-    # Load agent
-    state_space_shape = tuple(discretizer.n_bins)
+    # Get environment dimensions
+    state_dim = env.observation_space.shape[0]
     n_actions = env.action_space.n
     
-    agent = QLearningAgent(
-        state_space_shape=state_space_shape,
+    # Create agent
+    agent = DQNAgent(
+        state_dim=state_dim,
         n_actions=n_actions
     )
     agent.load(model_path)
     
-    print(f"Loaded agent from: {model_path}")
+    print(f"Loaded DQN agent from: {model_path}")
     print(f"Agent epsilon: {agent.epsilon:.4f}")
+    print(f"Device: {agent.device}")
     print(f"Evaluating over {n_episodes} episodes...")
     print("-" * 80)
     
@@ -81,22 +60,20 @@ def evaluate_agent(
     
     for episode in range(n_episodes):
         state, _ = env.reset()
-        state_discrete = discretizer.discretize(state)
         
         total_reward = 0
         steps = 0
         
         for step in range(max_steps):
             # Select action (greedy, no exploration)
-            action = agent.get_action(state_discrete, training=False)
+            action = agent.get_action(state, training=False)
             
             # Take action
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
-            next_state_discrete = discretizer.discretize(next_state)
             
             # Update state
-            state_discrete = next_state_discrete
+            state = next_state
             total_reward += reward
             steps += 1
             
@@ -145,13 +122,13 @@ def evaluate_agent(
 def main():
     """Main function with argument parsing."""
     parser = argparse.ArgumentParser(
-        description='Evaluate a trained Q-Learning agent on CartPole-v1'
+        description='Evaluate a trained DQN agent on CartPole-v1'
     )
     parser.add_argument(
         '--model',
         type=str,
         required=True,
-        help='Path to the saved agent model (.pkl file)'
+        help='Path to the saved agent model (.pth file)'
     )
     parser.add_argument(
         '--episodes',
